@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,17 +18,21 @@ namespace MugenWatcher
         public static bool PROCESS_ACTIVE;
 
         private static List<MugenManager> managers = new List<MugenManager>();
-        private static bool mugenFound = false;
+        public static bool mugenFound = false;
+        
 
         static void Main(string[] args)
         {
             VERBOSE_ACTIVE = args.Contains("-v") || args.Contains("--verbose");
             MATCH_ACTIVE = args.Contains("-m") || args.Contains("--match");
             PROCESS_ACTIVE = args.Contains("-p") || args.Contains("--process");
-            Run();
+
+
+            Challonge ch = new Challonge();
+            Run(ch);
         }
 
-        private static void Run()
+        private static void Run(Challonge ch)
         {
             while (true)
             {
@@ -42,12 +47,12 @@ namespace MugenWatcher
 
                 if (!mugenFound)
                 {
-                    List<Process> mugens = FindUntrackedMugens();
+                    List<Process> mugens = FindUntrackedMugens(ch);
                     if (mugens.Count > 0)
                     {
                         foreach (Process p in mugens)
                         {
-                            managers.Add(new MugenManager(p));
+                            managers.Add(new MugenManager(p,ch));
                             if (MATCH_ACTIVE || PROCESS_ACTIVE)
                             {
                                 mugenFound = true;
@@ -56,17 +61,18 @@ namespace MugenWatcher
                         }
                     }
                 }
-
                 Thread.Sleep(PROCESS_FIND_INTERVAL);
             }
         }
 
-        private static List<Process> FindUntrackedMugens()
+        private static List<Process> FindUntrackedMugens(Challonge ch)
         {
             Process[] mugens = MemoryReader.GetMugenHandles();
             List<Process> untracked = new List<Process>();
+            int counter = 0;
             foreach (Process p in mugens)
             {
+                counter++;
                 bool tracked = false;
                 foreach (MugenManager mm in managers)
                 {
@@ -80,6 +86,12 @@ namespace MugenWatcher
                 {
                     untracked.Add(p);
                 }
+            }
+            if(counter == 0)
+            {
+                ch.startTournament().Wait();
+                ch.getNextMatch().Wait();
+                ch.startMugen();
             }
             return untracked;
         }
